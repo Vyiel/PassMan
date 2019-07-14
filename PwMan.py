@@ -1,4 +1,7 @@
 import sqlite3
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+from Crypto import Random
 from selenium import webdriver
 import time
 import sys
@@ -23,17 +26,27 @@ class Db_methods:
             """)
         self.conn.commit()
 
+        self.conn = sqlite3.connect('db')
+        self.c = self.conn.cursor()
+        self.c.execute("""CREATE TABLE IF NOT EXISTS secret
+                (
+                    ID INTEGER PRIMARY KEY,
+                    master_pass TEXT
+                )
+                """)
+        self.conn.commit()
+
     def save(self, uname, passw, service):
 
         try:
             self.c.execute("INSERT INTO userinfo (uname, passw, service) VALUES (?, ?, ?)",
                            (uname, passw, service))
             self.conn.commit()
-            print("Information for " + self.uname + " Saved to Database successfully")
-            main()
+            print("Information for " + uname + " Saved to Database successfully")
+            #main()
         except:
             "Couldn't save to Database!!!"
-            main()
+            #main()
 
     def read_all(self):
         self.c.execute("SELECT * FROM userinfo")
@@ -52,20 +65,60 @@ class Db_methods:
                  , (uname, passw, service, id))
             self.conn.commit()
             print("Credentials updated successfully")
-            main()
+            #main()
         except:
             "Couldn't Update Database!!!"
-            main()
+            #main()
 
     def remove(self, id):
         try:
             self.c.execute("DELETE FROM userinfo WHERE ID = ?", [id])
             self.conn.commit()
             print("Credentials successfully removed")
-            main()
+            #main()
         except:
             print("Couldn't delete information from Database!!!")
-            main()
+            #main()
+
+    def save_pass(self, master_pass):
+        global id
+        id = 1
+        try:
+            self.c.execute("INSERT INTO secret (id, master_pass) VALUES (?, ?)", (id, master_pass))
+            print("Master Password Successfully being saved!!! ")
+            #main()
+        except:
+            print("Couldn't save to Database!!!")
+            #main()
+
+    def update_pass(self, master_pass):
+        id = 1
+        try:
+            self.c.execute("UPDATE secret SET passw=? WHERE ID=?", (master_pass, id))
+            print("Password successfully updated!!! ")
+            #main()
+        except:
+            print("Couldn't update to Database")
+            #main()
+
+    def retrieve_pass(self):
+        id = 1
+        self.c.execute("SELECT master_pass FROM secret WHERE ID = ?", [id])
+        return self.c.fetchone()
+
+
+    def remove_pass(self):
+        id = 1
+        try:
+            self.c.execute("DELETE FROM secret WHERE ID = ?", [id])
+            self.conn.commit()
+            print("Password successfully removed")
+            #main()
+        except:
+            print("Couldn't remove password from Database!!!")
+            #main()
+
+
 
 
 class Login:
@@ -89,7 +142,7 @@ class Login:
         driver.find_element_by_name("password").send_keys(passw)
         driver.find_element_by_class_name("CwaK9").click()
         # driver.close()
-        # main()
+        # #main()
 
     def facebook(self, uname, passw):
         self.uname = uname
@@ -101,10 +154,10 @@ class Login:
         driver.find_element_by_id('pass').send_keys(self.passw)
         driver.find_element_by_id('login_form').submit()
         driver.close()
-        main()
+        #main()
 
 
-class Basic:
+class Helper:
     listall = {}
     list_of_id = []
 
@@ -154,7 +207,6 @@ class Basic:
             else:
                 print("Incorrect Service Name!")
                 continue
-
 
 
     def update(self):
@@ -231,60 +283,140 @@ class Basic:
                 print("Invalid Service!!!")
         else:
             print("User information for this ID not found in the Database")
-            main()
+            #main()
+
+    def add_pass(self):
+        while True:
+            try:
+                passw1 = input('Enter Master Password: ')
+                passw2 = input('Re-Enter Master Password ')
+                if passw1 == passw2:
+                    hashed_pass = SHA256.new(passw1.encode('utf-8')).digest()
+                    self.db.save_pass(hashed_pass)
+                    break
+                else:
+                    print("The Password's didn't match")
+                    continue
+            except:
+                print("Error!!!")
+                continue
+
+    def update_pass(self):
+        while True:
+            try:
+                cpassw = input('Enter Current Password: ')
+                retcpass = self.db.retrieve_pass()
+                if cpassw == retcpass:
+                    passw1 = input('Enter New Master Password: ')
+                    passw2 = input('Re-Enter New Master Password ')
+                    if passw1 == passw2:
+                        hashed_pass = SHA256.new(passw1.encode('utf-8')).digest()
+                        self.db.update_pass(hashed_pass)
+                        break
+                    else:
+                        print("The Password's didn't match")
+                        continue
+                else:
+                    print("The current password didn't match!!! ")
+                    continue
+            except:
+                print("Error!!!")
+                continue
+
+    def remove_pass(self):
+        while True:
+            cpassw = input('Enter Current Password: ')
+            retcpass = self.db.retrieve_pass()
+            if cpassw == retcpass:
+                self.db.remove_pass()
+                break
+            else:
+                print("Please Enter the correct current password!!!")
+                continue
+
+    def check_pass(self):
+        return self.db.retrieve_pass()
 
 
 
-def main():
-    bf = Basic()
-    sdict_select = int()
-    sdict_res = str()
 
-    print("""
-        --> Choice of Options <--
 
-        1 -> Display Accounts
-        2 -> Add User Information
-        3 -> Update User Information
-        4 -> Delete User Information
-        5 -> Login with Credentials
 
-        """)
+bf = Helper()
+checker = bf.check_pass()
+if checker is None:
+    bf.add_pass()
+else:
+    print("Welcome")
 
-    sdict = {
-        1: bf.display,
-        2: bf.add,
-        3: bf.update,
-        4: bf.delete,
-        5: bf.login
-    }
-
-    while True:
-
-        try:
-            sdict_select = int(input("Enter choice of action: "))
-            sdict_res = sdict.get(sdict_select, False)()
-            break
-
-        except:
-            print("Invalid Selection!!! ")
-            continue
-
-if __name__ == '__main__':
-    while True:
-        try:
-            main()
-        except KeyboardInterrupt:
-            print('Process is killed by keyboard interrupt')
-            time.sleep(5)
-            sys.exit(0)
+# class security:
+#     # def Encrypt(self, info):
+#     def __init__(self):
 
 
 
 
+# def #main():
+#     bf = Helper()
+#     db = Db_methods()
+#     check = db.retrieve_pass()
+#     if check is not None:
+#         bf.add_pass()
+#
+#
+#         sdict_select = int()
+#         sdict_res = str()
+#
+#         print("""
+#             --> Choice of Options <--
+#
+#             1 -> Display Accounts
+#             2 -> Add User Information
+#             3 -> Update User Information
+#             4 -> Delete User Information
+#             5 -> Login with Credentials
+#
+#             """)
+#
+#         sdict = {
+#             1: bf.display,
+#             2: bf.add,
+#             3: bf.update,
+#             4: bf.delete,
+#             5: bf.login
+#         }
+#
+#         while True:
+#
+#             try:
+#                 sdict_select = int(input("Enter choice of action: "))
+#                 sdict_res = sdict.get(sdict_select, False)()
+#                 break
+#
+#             except:
+#                 print("Invalid Selection!!! ")
+#                 continue
+#     else:
+#         print("No Master Password is set. Please set a Master Password!!! ")
+#         bf.add_pass()
+#
+#
+# if __name__ == '__main__':
+#     while True:
+#         try:
+#             #main()
+#         except KeyboardInterrupt:
+#             print('Process is killed by keyboard interrupt')
+#             time.sleep(5)
+#             sys.exit(0)
 
 
 
+
+
+
+
+#bf = Helper()
 
 # TEST RUN FOR INDIVIDUAL DATABASE FUNCTIONS #
 # db.save('whatever u', 'whatever p', 'ggl') # WORKS FINE #
@@ -293,13 +425,15 @@ if __name__ == '__main__':
 # db.update('what', 'what', 'fb', 1) # WORKS FINE #
 # db.remove(3) # WORKS FINE #
 
-# TEST RUN FOR INDIVIDUAL BASIC FUNCTIONS #
+# TEST RUN FOR INDIVIDUAL Helper FUNCTIONS #
 # bf.add() # WORKS FINE AFTER MODIFICATION #
 # bf.update() # WORKS FINE #
 # bf.login() # WORKS FINE #
 # bf.delete() # WORKS FINE #
 # bf.display() # WORKS FINE #
-# bf = Basic() Works Fine
+# bf.add_pass()
+# bf = Helper() Works Fine
+
 
 # list_of_id = listall.keys()
 # a = bf.check_id(2, list_of_id)
