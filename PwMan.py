@@ -1,7 +1,8 @@
 import sqlite3
 from Crypto.Cipher import AES
-from Crypto.Hash import SHA256
+from Crypto.Protocol.KDF import PBKDF2
 from Crypto import Random
+from binascii import unhexlify
 from selenium import webdriver
 import sys
 import os
@@ -50,6 +51,16 @@ class Db_methods:
                 """)
         self.conn.commit()
 
+        self.conn = sqlite3.connect('db')
+        self.c = self.conn.cursor()
+        self.c.execute("""CREATE TABLE IF NOT EXISTS salt
+                        (
+                            ID INTEGER PRIMARY KEY,
+                            salt NONE
+                        )
+                        """)
+        self.conn.commit()
+
     def save(self, uname, passw, service):
 
         try:
@@ -57,10 +68,10 @@ class Db_methods:
                            (uname, passw, service))
             self.conn.commit()
             print("Information for " + uname + " Saved to Database successfully")
-            main()
         except:
             "Couldn't save to Database!!!"
-            main()
+            self.conn.rollback()
+
 
     def read_all(self):
         self.c.execute("SELECT * FROM userinfo")
@@ -79,20 +90,19 @@ class Db_methods:
                  , (uname, passw, service, id))
             self.conn.commit()
             print("Credentials updated successfully")
-            main()
+            self.conn.commit()
         except:
             "Couldn't Update Database!!!"
-            main()
+            self.conn.rollback()
 
     def remove(self, id):
         try:
             self.c.execute("DELETE FROM userinfo WHERE ID = ?", [id])
             self.conn.commit()
             print("Credentials successfully removed")
-            main()
         except:
             print("Couldn't delete information from Database!!!")
-            main()
+            self.conn.rollback()
 
     def save_pass(self, master_pass):
         id = 1
@@ -100,22 +110,21 @@ class Db_methods:
             self.c.execute("INSERT INTO secret (id, master_pass) VALUES (?, ?)", (id, master_pass))
             self.conn.commit()
             print("Master Password Successfully being saved!!! ")
-            main()
         except:
             print("Couldn't save to Database!!!")
-            main()
+            self.conn.rollback()
 
 
     def update_pass(self, master_pass):
         id = 1
         try:
-            self.c.execute("UPDATE secret SET passw=? WHERE ID=?", (master_pass, id))
+            self.c.execute("UPDATE secret SET master_pass=? WHERE ID=?", (master_pass, id))
             self.conn.commit()
-            print("Password successfully updated!!! ")
-            main()
+            print("Master Password successfully updated!!! ")
         except:
-            print("Couldn't update to Database")
-            main()
+            print("Couldn't update password to Database")
+            self.conn.rollback()
+
 
     def retrieve_pass(self):
         id = 1
@@ -127,12 +136,11 @@ class Db_methods:
         id = 1
         try:
             self.c.execute("DELETE FROM secret WHERE ID = ?", [id])
-            self.conn.commit()
             print("Password successfully removed")
-            main()
+            self.conn.commit()
         except:
             print("Couldn't remove password from Database!!!")
-            main()
+            self.conn.rollback()
 
     def save_vector(self, IV):
         id = 1
@@ -140,9 +148,9 @@ class Db_methods:
             self.c.execute("INSERT INTO vector (ID, IV) VALUES (?, ?)", (id, IV))
             self.conn.commit()
             print("IV saved to database")
-        except sqlite3.Error as e:
-            print(e)
+        except:
             print("Couldn't write vector to DB")
+            self.conn.rollback()
 
     def update_vector(self, IV):
         id = 1
@@ -151,14 +159,15 @@ class Db_methods:
             self.conn.commit()
         except:
             print("Couldn't update vector to DB")
+            self.conn.rollback()
 
     def retrieve_vector(self):
         id = 1
         try:
             self.c.execute("SELECT IV FROM vector WHERE ID = ?", [id])
             return self.c.fetchone()
-        except sqlite3.Error as e:
-            print(e)
+        except:
+            print("Couldn't retrieve vector")
 
     def remove_vector(self):
         id = 1
@@ -167,23 +176,59 @@ class Db_methods:
             self.conn.commit()
         except:
             print("Couldn't remove vector from Database!!!")
+            self.conn.rollback()
+
+    def save_salt(self, salt):
+        id = 1
+        try:
+            self.c.execute("INSERT INTO salt (ID, salt) VALUES (?, ?)", (id, salt))
+            self.conn.commit()
+            print("Salt saved to database")
+        except:
+            print("Couldn't write salt to DB")
+            self.conn.rollback()
+
+    def update_salt(self, salt):
+        id = 1
+        try:
+            self.c.execute("UPDATE salt SET salt=? WHERE ID=?", (salt, id))
+            self.conn.commit()
+        except:
+            print("Couldn't update salt to DB")
+            self.conn.rollback()
+
+    def remove_salt(self):
+        id = 1
+        try:
+            self.c.execute("DELETE FROM salt WHERE ID = ?", [id])
+            self.conn.commit()
+        except:
+            print("Couldn't remove salt from Database!!!")
+            self.conn.rollback()
+
+    def retrieve_salt(self):
+        id = 1
+        try:
+            self.c.execute("SELECT salt FROM salt WHERE ID = ?", [id])
+            return self.c.fetchone()
+        except:
+            print("Couldn't retrieve salt")
 
 
 class Login:
 
+    windows_location = os.environ['windir']
+    driver_loc = windows_location+"\chromedriver"
 
     def google(self, uname, passw):
         self.uname = uname
         self.passw = passw
-
-
-        chromedriver_location = 'C:\chromedriver'
         try:
-            driver = webdriver.Chrome(chromedriver_location)
+            driver = webdriver.Chrome(self.driver_loc)
         except:
-            print("""Probably The chrome driver is not matched with your current one.
+            print("""Probably The chrome driver is not matched with your current Google Chrome version.
             Please update chrome to the latest version, and download and save the latest
-            stable version of chromedriver on to C:\\ """)
+            stable version of chromedriver on to the root of your Windows Installation!!! """)
 
         target = 'https://accounts.google.com/signin/v2/identifier?continue=https%3A%2F%2Fmail.google.com%2Fmail%2F&service=mail&sacu=1&rip=1&flowName=GlifWebSignIn&flowEntry=ServiceLogin'
         driver.get(target)
@@ -199,8 +244,9 @@ class Login:
     def facebook(self, uname, passw):
         self.uname = uname
         self.passw = passw
-        driver = webdriver.Chrome('C:\chromedriver')
-        driver.get('https://www.facebook.com')
+        driver = webdriver.Chrome(self.driver_loc)
+        target = 'https://www.facebook.com'
+        driver.get(target)
         time.sleep(2)
         driver.find_element_by_id('email').send_keys(self.uname)
         driver.find_element_by_id('pass').send_keys(self.passw)
@@ -208,16 +254,17 @@ class Login:
         driver.close()
         main()
 
-
 class Helper:
     listall = {}
     list_of_id = []
+    global user_password
 
     def __init__(self):
         listall.clear()
         self.db = Db_methods()
         self.lg = Login()
         self.sec = Security()
+
         listInfo = self.db.read_all()
         if len(listInfo) == 0:
             print("There is no information in the database. Please add logins first!!! ")
@@ -248,20 +295,27 @@ class Helper:
             print(str(items) +"     "+ listall[items][0]+"     "+ service)
         print("")
 
+    def check_pass(self):
+        try:
+            return self.db.retrieve_pass()[0]
+        except:
+            return None
 
     def add(self):
+        global user_password
         while True:
             uname = input('Enter Username: ')
             passw = input('Enter Password: ')
             service = input('Enter Service -> ggl for "Google" and fb for "Facebook" : ')
             if service == "ggl" or service == "fb":
-                enc_pass = self.sec.Encrypt(passw, self.check_pass(), self.IV())
+                enc_pass = self.sec.Encrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
                 self.db.save(uname, enc_pass, service)
+                main()
                 break
             else:
                 print("Incorrect Service Name!")
                 continue
-
+                main()
 
     def update(self):
         self.display()
@@ -282,14 +336,16 @@ class Helper:
             while True:
                 service = input('Enter Service initials: ex:- "ggl/fb": ')
                 if service == "ggl" or service == "fb":
-                    enc_pass = self.sec.Encrypt(passw, self.check_pass(), self.IV())
+                    enc_pass = self.sec.Encrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
                     self.db.update(uname, enc_pass, service, select)
+                    main()
                     break
                 else:
                     print("Service Initials are not correct!!! ")
                     continue
         else:
             print("User information for this ID not found in the Database")
+            self.update()
 
     def delete(self):
         print("--> Remove Accounts <--")
@@ -307,9 +363,10 @@ class Helper:
         opt = self.check_id(select, list_of_id)
         if opt is True:
             self.db.remove(select)
+            main()
         else:
             print("User information for this ID not found in the Database")
-
+            self.delete()
 
     def login(self):
         print("--> Login <--")
@@ -330,17 +387,21 @@ class Helper:
             creds = self.db.read_one(select)
             uname = creds[1]
             passw = creds[2]
-            dec_pass = self.sec.Decrypt(passw, self.check_pass(), self.IV())
+            dec_pass = self.sec.Decrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
             service = creds[3]
-            if service == "ggl":
-                self.lg.google(uname, dec_pass)
-            elif service == "fb":
-                self.lg.facebook(uname, dec_pass)
-            else:
-                print("Invalid Service!!!")
+            while True:
+                if service == "ggl":
+                    self.lg.google(uname, dec_pass)
+                    break
+                elif service == "fb":
+                    self.lg.facebook(uname, dec_pass)
+                    break
+                else:
+                    print("Invalid Service!!!")
+                    continue
         else:
             print("User information for this ID not found in the Database")
-            main()
+            self.login()
 
     def add_pass(self):
         while True:
@@ -348,58 +409,124 @@ class Helper:
                 passw1 = input('Enter Master Password: ')
                 passw2 = input('Re-Enter Master Password ')
                 if passw1 == passw2:
-                    hashed_pass = SHA256.new(passw1.encode('utf-8')).digest()
+                    salt = self.salt()
+                    hashed_pass = self.key_derivation(passw=passw1, salt=salt)[0]
                     self.db.save_pass(hashed_pass)
+                    main()
                     break
                 else:
-                    print("The Password's didn't match")
+                    print("The Password's didn't match!!!")
                     continue
-            except Exception as e:
-                print(e)
+            except:
+                print("Error adding Password!!!")
+                main()
 
     def update_pass(self):
         while True:
             try:
-                hash_obj = SHA256.new()
                 cpassw = input('Enter Current Password: ')
-                hashed_cpassw = hash_obj.update(cpassw.encode('utf-8')).digest
-                retcpass = self.db.retrieve_pass()
+                hashed_cpassw = self.key_derivation(passw=cpassw, salt=self.salt())[0]
+                retcpass = self.db.retrieve_pass()[0]
                 if hashed_cpassw == retcpass:
-                    passw1 = input('Enter New Master Password: ')
-                    passw2 = input('Re-Enter New Master Password ')
-                    if passw1 == passw2:
-                        hashed_pass = hash_obj.update(passw1.encode('utf-8')).digest()
-                        self.db.update_pass(hashed_pass)
+                    current_enc_pass = cpassw
+                    new_passw1 = input('Enter New Master Password: ')
+                    new_passw2 = input('Re-Enter New Master Password ')
+                    if new_passw1 == new_passw2:
+                        new_enc_pass = new_passw1
+                        self.change_key_for_all(old_pass=current_enc_pass, new_pass=new_enc_pass)
                         break
                     else:
-                        print("The Password's didn't match")
+                        print("The Password's didn't match!!! ")
                         continue
                 else:
                     print("The current password didn't match!!! ")
                     continue
             except:
-                print("Error!!!")
-                continue
+                print("Error Updating Password!!! ")
+
 
     def remove_pass(self):
         while True:
-            hash_obj = SHA256.new()
             cpassw = input('Enter Current Password: ')
-            hashed_cpassw = hash_obj.update(cpassw.encode('utf-8')).digest()
+            hashed_cpassw = self.key_derivation(passw=cpassw, salt=self.salt())[0]
             retcpass = self.db.retrieve_pass()
             if hashed_cpassw == retcpass:
                 self.db.remove_pass()
+                main()
                 break
             else:
                 print("Please Enter the correct current password!!!")
                 continue
 
-    def check_pass(self):
-        try:
-            master_pass = self.db.retrieve_pass()[0]
-            return master_pass
-        except:
-            return None
+    def change_key_for_all(self, old_pass, new_pass):
+
+        old_salt = self.salt()
+        old_hkey_key, old_enc_key = self.key_derivation(passw=old_pass, salt=old_salt)
+        new_salt = self.sec.salt()
+        new_hkey_key, new_enc_key = self.key_derivation(passw=new_pass, salt=new_salt)
+        old_IV = self.IV()
+        new_IV = self.sec.init_Vector()
+        ids = []
+        all_items = self.db.read_all()
+
+        re_encrypted_ids = []
+        error_stat_UPDATE = 0
+        for all_ids in all_items:
+            ids.append(all_ids[0])
+
+        for i in ids:
+            upass = self.db.read_one(i)[2]
+            decrypt = self.sec.Decrypt(passw=upass, KEY=old_enc_key, IV=old_IV)
+            re_encrypt = self.sec.Encrypt(passw=decrypt, KEY=new_enc_key, IV=new_IV)
+
+            try:
+                self.conn = sqlite3.connect('db')
+                self.c = self.conn.cursor()
+                self.c.execute("UPDATE userinfo SET passw=? WHERE ID = ?", (re_encrypt, i))
+                self.conn.commit()
+                re_encrypted_ids.append(i)
+            except:
+                self.conn.rollback()
+                error_stat_UPDATE = 1
+                break
+
+        if error_stat_UPDATE == 0:
+            self.db.update_pass(new_hkey_key)
+            self.update_iv(new_IV)
+            self.update_salt(new_salt)
+
+        else:
+            print("Error Updating Master Password. Rolling back changes!!! ")
+            for j in re_encrypted_ids:
+                re_upass = self.db.read_one(j)[2]
+                re_decrypt = self.sec.Decrypt(passw=re_upass, KEY=new_enc_key, IV=new_IV)
+                r_encrypt = self.sec.Encrypt(passw=re_decrypt, KEY=old_enc_key, IV=old_IV)
+                try:
+                    self.c.execute("UPDATE userinfo SET passw=? WHERE ID = ?", (r_encrypt, j))
+                    self.conn.commit()
+                except:
+                    self.conn.rollback()
+
+            self.db.update_pass(old_hkey_key)
+            self.update_iv(old_IV)
+            self.update_salt(old_salt)
+
+
+    def key_derivation(self, passw, salt):
+        global user_password
+        dk = []
+        hk = []
+        hasher = PBKDF2(password=passw, count=5000, salt=salt, dkLen=64).hex()
+        for i in range(64):
+            hk.append(hasher[i])
+        for j in range(64, 128):
+            dk.append(hasher[j])
+
+        hk = "".join(hk)
+        dk = unhexlify("".join(dk))
+
+        return (hk, dk)
+
 
     def make_IV(self):
         IV = self.sec.init_Vector()
@@ -415,12 +542,32 @@ class Helper:
         except:
             return False
 
-    def update_iv(self):
-        iv = self.sec.init_Vector()
+    def update_iv(self, iv):
         self.db.update_vector(iv)
 
     def del_iv(self):
         self.db.remove_vector()
+
+
+    def make_salt(self):
+        salt = self.sec.salt()
+        self.save_salt(salt)
+
+    def save_salt(self, salt):
+        self.db.save_salt(salt)
+
+    def salt(self):
+        try:
+            salt = self.db.retrieve_salt()[0]
+            return salt
+        except:
+            return False
+
+    def update_salt(self, salt):
+        self.db.update_salt(salt)
+
+    def del_salt(self):
+        self.db.remove_salt()
 
     def this_login(self):
         userpass = input("Enter Login Password: ")
@@ -429,8 +576,12 @@ class Helper:
     def make_session(self, user_pass):
         global _session
         self.user_pass = user_pass
-        userhash = SHA256.new(self.user_pass.encode('utf-8')).digest()
+        salt = self.salt()
+        print("debug: salt from make session is " + str(salt))
+        userhash = self.key_derivation(passw=user_pass, salt=salt)[0]
+        print("debug: user hash from make session is " + str(userhash))
         stored_pass = self.check_pass()
+        print("debug: stored pass hash from make session is " + str(stored_pass))
         if userhash == stored_pass:
             _session = True
             return True
@@ -453,6 +604,12 @@ class Security:
         BLOCK_SIZE = 16
         IV = Random.new().read(BLOCK_SIZE)
         return IV
+
+    def salt(self):
+        global BLOCK_SIZE
+        BLOCK_SIZE = 16
+        salt = Random.new().read(BLOCK_SIZE)
+        return salt
 
     def Encrypt(self, passw, KEY, IV):
         BLOCK_SIZE = 16
@@ -478,69 +635,84 @@ def main():
     bf = Helper()
     db = Db_methods()
     check = bf.check_pass()
+    print("Password retrieved from main is " + str(check))
     IV = bf.IV()
     if IV is False:
         bf.make_IV()
+    # else:
+    #     IV = bf.IV()
+
+    salt = bf.salt()
+    if salt is False:
+        bf.make_salt()
+
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "up":
+            bf.update_pass()
+            system = 1
+        else:
+            system = 0
     else:
-        IV = bf.IV()
-        print(IV)
+        system = 0
 
-    if check is None:
-        print("No Master Password is set. Please set a Master Password!!! ")
-        bf.add_pass()
-    else:
-        while True:
-            if bf.check_session() is False:
-                while True:
-                    login = bf.this_login()
-                    if bf.make_session(login) is True:
-                        break
-                    else:
-                        print("Wrong Password. Check and try again!!!")
-                        continue
+    if system == 0:
 
-            else:
+        if check is None:
+            print("No Master Password is set. Please set a Master Password!!! ")
+            bf.add_pass()
+        else:
+            while True:
+                if bf.check_session() is False:
+                    while True:
+                        login = bf.this_login()
+                        if bf.make_session(login) is True:
+                            global user_password
+                            user_password = login
+                            break
+                        else:
+                            print("Wrong Password. Check and try again!!!")
+                            continue
 
-                print("""
-                    --> Choice of Options <--
+                else:
 
-                    1 -> Display Accounts
-                    2 -> Add User Information
-                    3 -> Update User Information
-                    4 -> Delete User Information
-                    5 -> Login with Credentials
+                    print("""
+                        --> Choice of Options <--
 
-                    """)
+                        1 -> Display Accounts
+                        2 -> Add User Information
+                        3 -> Update User Information
+                        4 -> Delete User Information
+                        5 -> Login with Credentials
 
-                sdict = {
-                    1: bf.display,
-                    2: bf.add,
-                    3: bf.update,
-                    4: bf.delete,
-                    5: bf.login
-                }
+                        """)
 
-                while True:
+                    sdict = {
+                        1: bf.display,
+                        2: bf.add,
+                        3: bf.update,
+                        4: bf.delete,
+                        5: bf.login
+                    }
 
-                    try:
-                        sdict_select = int(input("Enter choice of action: "))
-                        sdict_res = sdict.get(sdict_select, False)()
-                        break
+                    while True:
 
-                    except:
-                        print("Invalid Selection!!! ")
-                        continue
+                        try:
+                            sdict_select = int(input("Enter choice of action: "))
+                            sdict_res = sdict.get(sdict_select, False)()
+                            break
+
+                        except:
+                            print("Invalid Selection!!! ")
+                            continue
 
 
 def kill_session():
     # while True:
-    #     print("started")
-    #     time.sleep(30)
+    #     time.sleep(60)
     #     global _session
     #     _session = False
     #     print("Session has expired. Please Login Again!!! ")
     a = 1
-
 
 if __name__ == '__main__':
 
@@ -552,6 +724,9 @@ if __name__ == '__main__':
     s_kill.join()
 
 # bf = Helper()
+# bf.add()
+# bf.change_key_for_all()
+
 # bf.make_IV()
 # print(bf.IV())
 
