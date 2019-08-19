@@ -8,6 +8,9 @@ import sys
 import os
 import time
 from threading import Thread
+from clipboard import copy
+from webbrowser import open as browser_open
+
 
 listall = {}
 id = []
@@ -121,9 +124,11 @@ class Db_methods:
             self.c.execute("UPDATE secret SET master_pass=? WHERE ID=?", (master_pass, id))
             self.conn.commit()
             print("Master Password successfully updated!!! ")
+
         except:
             print("Couldn't update password to Database")
             self.conn.rollback()
+
 
 
     def retrieve_pass(self):
@@ -217,29 +222,36 @@ class Db_methods:
 
 class Login:
 
-    windows_location = os.environ['windir']
-    driver_loc = windows_location+"\chromedriver"
+    windows_location = str(os.environ['windir'])
+    rootdir = windows_location[:2]
+    driver_loc = rootdir+"\chromedriver"
+    print(driver_loc)
 
     def google(self, uname, passw):
         self.uname = uname
         self.passw = passw
         try:
-            driver = webdriver.Chrome(self.driver_loc)
-        except:
+            driver = webdriver.Chrome(executable_path=self.driver_loc)
+
+        except Exception:
             print("""Probably The chrome driver is not matched with your current Google Chrome version.
             Please update chrome to the latest version, and download and save the latest
             stable version of chromedriver on to the root of your Windows Installation!!! """)
+            main()
+        try:
+            target = 'https://accounts.google.com/signin/v2/identifier?continue=https%3A%2F%2Fmail.google.com%2Fmail%2F&service=mail&sacu=1&rip=1&flowName=GlifWebSignIn&flowEntry=ServiceLogin'
+            driver.get(target)
 
-        target = 'https://accounts.google.com/signin/v2/identifier?continue=https%3A%2F%2Fmail.google.com%2Fmail%2F&service=mail&sacu=1&rip=1&flowName=GlifWebSignIn&flowEntry=ServiceLogin'
-        driver.get(target)
+            driver.find_element_by_id("identifierId").send_keys(self.uname)
+            driver.find_element_by_class_name('CwaK9').click()
+            time.sleep(2)
+            driver.find_element_by_name("password").send_keys(passw)
+            driver.find_element_by_class_name("CwaK9").click()
+            main()
+        except:
+            print("Error during login. Try again!!! ")
+            main()
 
-        driver.find_element_by_id("identifierId").send_keys(self.uname)
-        driver.find_element_by_class_name('CwaK9').click()
-        time.sleep(2)
-        driver.find_element_by_name("password").send_keys(passw)
-        driver.find_element_by_class_name("CwaK9").click()
-        driver.close()
-        main()
 
     def facebook(self, uname, passw):
         self.uname = uname
@@ -251,8 +263,26 @@ class Login:
         driver.find_element_by_id('email').send_keys(self.uname)
         driver.find_element_by_id('pass').send_keys(self.passw)
         driver.find_element_by_id('login_form').submit()
-        driver.close()
         main()
+
+class NoLogin():
+
+    def clip(self, uname, passw, service):
+        self.uname = uname
+        self.passw = passw
+        self.service = service
+
+        print("The User Name or Email is: "+str(self.uname))
+        print("""
+        wait for page to load, Type in the username. 
+        Password is copied in the clipboard. Just paste within the password box!!!
+        """)
+        time.sleep(3)
+        browser_open(service)
+        copy(self.passw)
+        time.sleep(1)
+        main()
+
 
 class Helper:
     listall = {}
@@ -264,6 +294,8 @@ class Helper:
         self.db = Db_methods()
         self.lg = Login()
         self.sec = Security()
+        self.clipboard = NoLogin()
+
 
         listInfo = self.db.read_all()
         if len(listInfo) == 0:
@@ -281,19 +313,17 @@ class Helper:
             return True
         else:
             return False
+
     @staticmethod
     def display():
 
         print("--> All Accounts <--")
 
         for items in listall:
-            if listall[items][1] == "ggl":
-                service = "Google"
-            elif listall[items][1] == "fb":
-                service = "Facebook"
 
-            print(str(items) +"     "+ listall[items][0]+"     "+ service)
-        print("")
+            user_name = listall[items][0]
+            service_name = str(listall[items][1]).split('.')[1]
+            print(str(items) + "     " + "User Name: " + user_name + "     " + "Service: " + service_name)
 
     def check_pass(self):
         try:
@@ -306,16 +336,11 @@ class Helper:
         while True:
             uname = input('Enter Username: ')
             passw = input('Enter Password: ')
-            service = input('Enter Service -> ggl for "Google" and fb for "Facebook" : ')
-            if service == "ggl" or service == "fb":
-                enc_pass = self.sec.Encrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
-                self.db.save(uname, enc_pass, service)
-                main()
-                break
-            else:
-                print("Incorrect Service Name!")
-                continue
-                main()
+            service = input('Enter Service -> Copy and Paste The exact login page URL: ')
+            enc_pass = self.sec.Encrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
+            self.db.save(uname, enc_pass, service)
+            main()
+            break
 
     def update(self):
         self.display()
@@ -334,18 +359,13 @@ class Helper:
             uname = input('Enter Username to update: ')
             passw = input('Enter Password to update: ')
             while True:
-                service = input('Enter Service initials: ex:- "ggl/fb": ')
-                if service == "ggl" or service == "fb":
-                    enc_pass = self.sec.Encrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
-                    self.db.update(uname, enc_pass, service, select)
-                    main()
-                    break
-                else:
-                    print("Service Initials are not correct!!! ")
-                    continue
+                service = input("Update Service -> Copy and Paste The exact login page URL: ")
+                enc_pass = self.sec.Encrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
+                self.db.update(uname, enc_pass, service, select)
+                main()
         else:
             print("User information for this ID not found in the Database")
-            self.update()
+            main()
 
     def delete(self):
         print("--> Remove Accounts <--")
@@ -375,10 +395,9 @@ class Helper:
         while True:
             try:
                 select = int(input("Enter choice of ID from before the User Names to Login: "))
-                print(select)
                 break
             except:
-                print("selection type for deletion not integer!!! ")
+                print("selection type for Login not integer!!! ")
                 continue
 
         list_of_id = listall.keys()
@@ -390,18 +409,63 @@ class Helper:
             dec_pass = self.sec.Decrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
             service = creds[3]
             while True:
-                if service == "ggl":
+                if service.find("google") > 0:
                     self.lg.google(uname, dec_pass)
                     break
-                elif service == "fb":
+                elif service.find("facebook") > 0:
                     self.lg.facebook(uname, dec_pass)
                     break
                 else:
-                    print("Invalid Service!!!")
-                    continue
+                    print("Invalid Service Credentials !!! Login (BETA) only works for Google OR/AND Facebook")
+                    main()
         else:
             print("User information for this ID not found in the Database")
-            self.login()
+            main()
+
+    def clip(self):
+        print("--> Clipboard Login <--")
+        self.display()
+
+        while True:
+            try:
+                select = int(input("Enter choice of ID from before the User Names for Clipboard: "))
+                break
+            except:
+                print("selection type for Clipboard not integer!!! ")
+                continue
+
+        list_of_id = listall.keys()
+        opt = self.check_id(select, list_of_id)
+        if opt is True:
+            creds = self.db.read_one(select)
+            uname = creds[1]
+            passw = creds[2]
+            dec_pass = self.sec.Decrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
+            service = creds[3]
+            self.clipboard.clip(uname, dec_pass, service)
+        else:
+            print("User information for this ID not found in the Database")
+            main()
+
+    def export(self):
+
+        export = {}
+        all = self.db.read_all()
+        for i in all:
+            id = i[0]
+            uname = i[1]
+            passw = self.sec.Decrypt(i[2], self.key_derivation(user_password, self.salt())[1], self.IV())
+            service = str(i[3]).split('.')[1]
+            export[id] = [uname, passw, service]
+
+        file = open("User information.txt", "a")
+        file.write("Exported Username and Passwords")
+        file.write("\n\n\n")
+        for i in export.values():
+            text = "User Name: " + i[0] + ", " + "Password: " + i[1] + ", " + "Service: " + i[2]
+            file.write(text + '\n\n')
+        file.close()
+
 
     def add_pass(self):
         while True:
@@ -630,17 +694,28 @@ class Security:
 
 def main():
 
+    def false_select():
+        print("Invalid Selection!!!")
+        return False
+
+    def quit():
+        print("Thanks for using the program!!! ")
+        # time.sleep(1)
+        try:
+            sys.exit()
+        except Exception as e:
+            print(e)
+            os._exit()
+
+
     sdict_select = int()
     sdict_res = str()
     bf = Helper()
-    db = Db_methods()
     check = bf.check_pass()
     print("Password retrieved from main is " + str(check))
     IV = bf.IV()
     if IV is False:
         bf.make_IV()
-    # else:
-    #     IV = bf.IV()
 
     salt = bf.salt()
     if salt is False:
@@ -683,6 +758,9 @@ def main():
                         3 -> Update User Information
                         4 -> Delete User Information
                         5 -> Login with Credentials
+                        6 -> Clipboard Login
+                        7 -> Export all
+                        8 -> Quit!!!
 
                         """)
 
@@ -691,28 +769,27 @@ def main():
                         2: bf.add,
                         3: bf.update,
                         4: bf.delete,
-                        5: bf.login
+                        5: bf.login,
+                        6: bf.clip,
+                        7: bf.export,
+                        8: quit
                     }
 
                     while True:
-
                         try:
                             sdict_select = int(input("Enter choice of action: "))
-                            sdict_res = sdict.get(sdict_select, False)()
-                            break
-
-                        except:
-                            print("Invalid Selection!!! ")
-                            continue
+                            sdict.get(sdict_select, false_select)()
+                        except Exception:
+                            print("Invalid Selection!!!")
 
 
 def kill_session():
-    # while True:
-    #     time.sleep(60)
-    #     global _session
-    #     _session = False
-    #     print("Session has expired. Please Login Again!!! ")
-    a = 1
+    while True:
+        time.sleep(360)
+        global _session
+        _session = False
+        print("\nSession has expired. Please Login Again!!! \n")
+
 
 if __name__ == '__main__':
 
@@ -723,30 +800,3 @@ if __name__ == '__main__':
     main_thread.join()
     s_kill.join()
 
-# bf = Helper()
-# bf.add()
-# bf.change_key_for_all()
-
-# bf.make_IV()
-# print(bf.IV())
-
-# TEST RUN FOR INDIVIDUAL DATABASE FUNCTIONS #
-# db.save('whatever u', 'whatever p', 'ggl') # WORKS FINE #
-# print(db.read_all()) # WORKS FINE #
-# print(db.read_one(1)) # WORKS FINE #
-# db.update('what', 'what', 'fb', 1) # WORKS FINE #
-# db.remove(3) # WORKS FINE #
-
-# TEST RUN FOR INDIVIDUAL Helper FUNCTIONS #
-# bf.add() # WORKS FINE AFTER MODIFICATION #
-# bf.update() # WORKS FINE #
-# bf.login() # WORKS FINE #
-# bf.delete() # WORKS FINE #
-# bf.display() # WORKS FINE #
-# bf.add_pass()
-# bf = Helper() Works Fine
-
-
-# list_of_id = listall.keys()
-# a = bf.check_id(2, list_of_id)
-# print(a)
