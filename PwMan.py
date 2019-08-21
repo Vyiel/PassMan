@@ -15,8 +15,7 @@ from webbrowser import open as browser_open
 listall = {}
 id = []
 name = []
-global _session
-_session = False
+
 
 class Db_methods:
 
@@ -339,7 +338,7 @@ class Helper:
             service = input('Enter Service -> Copy and Paste The exact login page URL: ')
             enc_pass = self.sec.Encrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
             self.db.save(uname, enc_pass, service)
-            main()
+            program()
             break
 
     def update(self):
@@ -362,10 +361,10 @@ class Helper:
                 service = input("Update Service -> Copy and Paste The exact login page URL: ")
                 enc_pass = self.sec.Encrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
                 self.db.update(uname, enc_pass, service, select)
-                main()
+                program()
         else:
             print("User information for this ID not found in the Database")
-            main()
+            program()
 
     def delete(self):
         print("--> Remove Accounts <--")
@@ -383,7 +382,7 @@ class Helper:
         opt = self.check_id(select, list_of_id)
         if opt is True:
             self.db.remove(select)
-            main()
+            program()
         else:
             print("User information for this ID not found in the Database")
             self.delete()
@@ -417,10 +416,10 @@ class Helper:
                     break
                 else:
                     print("Invalid Service Credentials !!! Login (BETA) only works for Google OR/AND Facebook")
-                    main()
+                    program()
         else:
             print("User information for this ID not found in the Database")
-            main()
+            program()
 
     def clip(self):
         print("--> Clipboard Login <--")
@@ -445,7 +444,7 @@ class Helper:
             self.clipboard.clip(uname, dec_pass, service)
         else:
             print("User information for this ID not found in the Database")
-            main()
+            program()
 
     def export(self):
 
@@ -458,13 +457,14 @@ class Helper:
             service = str(i[3]).split('.')[1]
             export[id] = [uname, passw, service]
 
-        file = open("User information.txt", "a")
+        file = open("User information.txt", "w")
         file.write("Exported Username and Passwords")
         file.write("\n\n\n")
         for i in export.values():
             text = "User Name: " + i[0] + ", " + "Password: " + i[1] + ", " + "Service: " + i[2]
             file.write(text + '\n\n')
         file.close()
+        program()
 
 
     def add_pass(self):
@@ -498,7 +498,8 @@ class Helper:
                     if new_passw1 == new_passw2:
                         new_enc_pass = new_passw1
                         self.change_key_for_all(old_pass=current_enc_pass, new_pass=new_enc_pass)
-                        break
+                        time.sleep(1)
+                        os._exit(0)
                     else:
                         print("The Password's didn't match!!! ")
                         continue
@@ -507,6 +508,7 @@ class Helper:
                     continue
             except:
                 print("Error Updating Password!!! ")
+
 
 
     def remove_pass(self):
@@ -638,19 +640,18 @@ class Helper:
         return userpass
 
     def make_session(self, user_pass):
-        global _session
-        self.user_pass = user_pass
+        global _session, user_password
         salt = self.salt()
-        print("debug: salt from make session is " + str(salt))
         userhash = self.key_derivation(passw=user_pass, salt=salt)[0]
-        print("debug: user hash from make session is " + str(userhash))
         stored_pass = self.check_pass()
-        print("debug: stored pass hash from make session is " + str(stored_pass))
         if userhash == stored_pass:
             _session = True
-            return True
+            user_password = user_pass
         else:
-            return False
+            _session = False
+            user_password = ""
+            print("Wrong Login Password. Check and Try again!!!")
+            program()
 
     def check_session(self):
         global _session
@@ -692,7 +693,8 @@ class Security:
         return plaintext[:pad_index]
 
 
-def main():
+def program():
+
 
     def false_select():
         print("Invalid Selection!!!")
@@ -700,19 +702,48 @@ def main():
 
     def quit():
         print("Thanks for using the program!!! ")
-        # time.sleep(1)
-        try:
-            sys.exit()
-        except Exception as e:
-            print(e)
-            os._exit()
+        time.sleep(1)
+        os._exit(0)
+
+    def select():
+        sdict_select = int()
+        sdict_select = ""
+        sdict_res = str()
+        print("""
+                            --> Choice of Options <--
+
+                            1 -> Display Accounts
+                            2 -> Add User Information
+                            3 -> Update User Information
+                            4 -> Delete User Information
+                            5 -> Login with Credentials (BETA)
+                            6 -> Clipboard Login
+                            7 -> Export all
+                            8 -> Quit!!!
+
+                            """)
+
+        sdict = {
+            1: bf.display,
+            2: bf.add,
+            3: bf.update,
+            4: bf.delete,
+            5: bf.login,
+            6: bf.clip,
+            7: bf.export,
+            8: quit
+        }
+
+        while True:
+            try:
+                sdict_select = int(input("Enter choice of action: "))
+                sdict.get(sdict_select, false_select)()
+            except:
+                program()
 
 
-    sdict_select = int()
-    sdict_res = str()
     bf = Helper()
     check = bf.check_pass()
-    print("Password retrieved from main is " + str(check))
     IV = bf.IV()
     if IV is False:
         bf.make_IV()
@@ -738,65 +769,35 @@ def main():
         else:
             while True:
                 if bf.check_session() is False:
-                    while True:
-                        login = bf.this_login()
-                        if bf.make_session(login) is True:
-                            global user_password
-                            user_password = login
-                            break
-                        else:
-                            print("Wrong Password. Check and try again!!!")
-                            continue
-
+                    login = bf.this_login()
+                    bf.make_session(login)
                 else:
+                    select()
 
-                    print("""
-                        --> Choice of Options <--
-
-                        1 -> Display Accounts
-                        2 -> Add User Information
-                        3 -> Update User Information
-                        4 -> Delete User Information
-                        5 -> Login with Credentials
-                        6 -> Clipboard Login
-                        7 -> Export all
-                        8 -> Quit!!!
-
-                        """)
-
-                    sdict = {
-                        1: bf.display,
-                        2: bf.add,
-                        3: bf.update,
-                        4: bf.delete,
-                        5: bf.login,
-                        6: bf.clip,
-                        7: bf.export,
-                        8: quit
-                    }
-
-                    while True:
-                        try:
-                            sdict_select = int(input("Enter choice of action: "))
-                            sdict.get(sdict_select, false_select)()
-                        except Exception:
-                            print("Invalid Selection!!!")
 
 
 def kill_session():
     while True:
-        time.sleep(360)
-        global _session
+        print("started")
+        global _session, user_password
+        time.sleep(20)
         _session = False
+        user_password = ""
         print("\nSession has expired. Please Login Again!!! \n")
 
 
-if __name__ == '__main__':
-
-    main_thread = Thread(target=main)
+def main():
+    global _session
+    _session = False
+    main_thread = Thread(target=program)
     main_thread.start()
     s_kill = Thread(target=kill_session, daemon=True)
     s_kill.start()
     main_thread.join()
     s_kill.join()
+
+
+if __name__ == '__main__':
+
+    main()
 
