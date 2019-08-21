@@ -273,20 +273,21 @@ class NoLogin():
 
         print("The User Name or Email is: "+str(self.uname))
         print("""
-        wait for page to load, Type in the username. 
+        Wait for page to load, Type in the username. 
         Password is copied in the clipboard. Just paste within the password box!!!
         """)
         time.sleep(3)
         browser_open(service)
         copy(self.passw)
         time.sleep(1)
-        main()
+        program()
 
 
 class Helper:
     listall = {}
     list_of_id = []
     global user_password
+    global _session
 
     def __init__(self):
         listall.clear()
@@ -319,9 +320,25 @@ class Helper:
         print("--> All Accounts <--")
 
         for items in listall:
-
             user_name = listall[items][0]
-            service_name = str(listall[items][1]).split('.')[1]
+            try:
+                service_name = str(listall[items][1]).split('.')[1]
+            except:
+                service_name = "Unknown"
+            print(str(items) + "     " + "User Name: " + user_name + "     " + "Service: " + service_name)
+        program()
+
+    @staticmethod
+    def display2():
+
+        print("--> All Accounts <--")
+
+        for items in listall:
+            user_name = listall[items][0]
+            try:
+                service_name = str(listall[items][1]).split('.')[1]
+            except:
+                service_name = "Unknown"
             print(str(items) + "     " + "User Name: " + user_name + "     " + "Service: " + service_name)
 
     def check_pass(self):
@@ -342,7 +359,7 @@ class Helper:
             break
 
     def update(self):
-        self.display()
+        self.display2()
 
         while True:
             try:
@@ -362,13 +379,14 @@ class Helper:
                 enc_pass = self.sec.Encrypt(passw, self.key_derivation(user_password, self.salt())[1], self.IV())
                 self.db.update(uname, enc_pass, service, select)
                 program()
+                break
         else:
             print("User information for this ID not found in the Database")
             program()
 
     def delete(self):
         print("--> Remove Accounts <--")
-        self.display()
+        self.display2()
 
         while True:
             try:
@@ -385,11 +403,11 @@ class Helper:
             program()
         else:
             print("User information for this ID not found in the Database")
-            self.delete()
+            program()
 
     def login(self):
         print("--> Login <--")
-        self.display()
+        self.display2()
 
         while True:
             try:
@@ -423,7 +441,7 @@ class Helper:
 
     def clip(self):
         print("--> Clipboard Login <--")
-        self.display()
+        self.display2()
 
         while True:
             try:
@@ -476,14 +494,14 @@ class Helper:
                     salt = self.salt()
                     hashed_pass = self.key_derivation(passw=passw1, salt=salt)[0]
                     self.db.save_pass(hashed_pass)
-                    main()
+                    program()
                     break
                 else:
                     print("The Password's didn't match!!!")
                     continue
             except:
                 print("Error adding Password!!!")
-                main()
+                program()
 
     def update_pass(self):
         while True:
@@ -640,16 +658,17 @@ class Helper:
         return userpass
 
     def make_session(self, user_pass):
-        global _session, user_password
+        global user_password, _session
         salt = self.salt()
         userhash = self.key_derivation(passw=user_pass, salt=salt)[0]
         stored_pass = self.check_pass()
         if userhash == stored_pass:
-            _session = True
             user_password = user_pass
+            _session = True
+            program()
         else:
-            _session = False
             user_password = ""
+            _session = ""
             print("Wrong Login Password. Check and Try again!!!")
             program()
 
@@ -695,9 +714,9 @@ class Security:
 
 def program():
 
-
     def false_select():
         print("Invalid Selection!!!")
+        select()
         return False
 
     def quit():
@@ -738,9 +757,10 @@ def program():
             try:
                 sdict_select = int(input("Enter choice of action: "))
                 sdict.get(sdict_select, false_select)()
+                break
             except:
-                program()
-
+                print("Invalid Selection!!!")
+                select()
 
     bf = Helper()
     check = bf.check_pass()
@@ -767,23 +787,17 @@ def program():
             print("No Master Password is set. Please set a Master Password!!! ")
             bf.add_pass()
         else:
-            while True:
-                if bf.check_session() is False:
-                    login = bf.this_login()
-                    bf.make_session(login)
-                else:
-                    select()
+            if bf.check_session() is False:
+                login = bf.this_login()
+                bf.make_session(login)
+            else:
+                select()
 
 
-
-def kill_session():
-    while True:
-        print("started")
-        global _session, user_password
-        time.sleep(20)
-        _session = False
-        user_password = ""
-        print("\nSession has expired. Please Login Again!!! \n")
+def auto_quit():
+    print("Auto Quitting in 3 Minutes")
+    time.sleep(30)
+    os._exit(0)
 
 
 def main():
@@ -791,7 +805,7 @@ def main():
     _session = False
     main_thread = Thread(target=program)
     main_thread.start()
-    s_kill = Thread(target=kill_session, daemon=True)
+    s_kill = Thread(target=auto_quit(), daemon=True)
     s_kill.start()
     main_thread.join()
     s_kill.join()
