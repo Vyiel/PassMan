@@ -1,5 +1,5 @@
 # PassMan
-A Simple, Local, Single user Password Manager based on Python. Windows only
+A Simple, Local, Single user Password Manager based on Python. Windows only.
 
 This is a local password manager that you can keep at your home, upload the database somewhere in the cloud, All you have to do is remember the password,
 or even write the password down somewhere safe. This doesn't have any internet permissions, so it's objectively secure.
@@ -12,4 +12,4 @@ Else, you can use the clipboard way to login, where you have to just type in the
 To update the master password, you have to run the command 'python PwMan up'. Thus the password would be updated. Also no password recovery has been implemented yet.
 If you forget the password, the database is useless. 
 
-That's it. 
+That's it ...
