@@ -21,3 +21,5 @@ Following packages:
 Rest of the packages come with Python.
 
 That's it ...
+
+Technical Aspects regarding security: The program uses RFC Complient security reference 2898. Which means Instead of simply hashing the password, Password Based Key Derivation function Version 2 has been used with multiple rounds with the Pseudo random function SHA1. One part of the derived key has been used as a varification during login, and the other half as the Encryption/Decryption key. The Encryption that is used 32 bytes AES with a Cipher Block Chain mode. 
