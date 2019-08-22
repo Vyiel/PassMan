@@ -151,7 +151,6 @@ class Db_methods:
         try:
             self.c.execute("INSERT INTO vector (ID, IV) VALUES (?, ?)", (id, IV))
             self.conn.commit()
-            print("IV saved to database")
         except:
             print("Couldn't write vector to DB")
             self.conn.rollback()
@@ -187,7 +186,6 @@ class Db_methods:
         try:
             self.c.execute("INSERT INTO salt (ID, salt) VALUES (?, ?)", (id, salt))
             self.conn.commit()
-            print("Salt saved to database")
         except:
             print("Couldn't write salt to DB")
             self.conn.rollback()
@@ -472,7 +470,11 @@ class Helper:
             id = i[0]
             uname = i[1]
             passw = self.sec.Decrypt(i[2], self.key_derivation(user_password, self.salt())[1], self.IV())
-            service = str(i[3]).split('.')[1]
+            try:
+                service = str(i[3]).split('.')[1]
+            except:
+                service = "Unknown"
+
             export[id] = [uname, passw, service]
 
         file = open("User information.txt", "w")
@@ -483,6 +485,7 @@ class Helper:
             file.write(text + '\n\n')
         file.close()
         program()
+
 
 
     def add_pass(self):
@@ -796,7 +799,7 @@ def program():
 
 def auto_quit():
     print("Auto Quitting in 3 Minutes")
-    time.sleep(30)
+    time.sleep(60*3)
     os._exit(0)
 
 
