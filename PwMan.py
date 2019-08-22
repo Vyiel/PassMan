@@ -222,7 +222,6 @@ class Login:
     windows_location = str(os.environ['windir'])
     rootdir = windows_location[:2]
     driver_loc = rootdir+"\chromedriver"
-    print(driver_loc)
 
     def google(self, uname, passw):
         self.uname = uname
@@ -474,7 +473,6 @@ class Helper:
                 service = str(i[3]).split('.')[1]
             except:
                 service = "Unknown"
-
             export[id] = [uname, passw, service]
 
         file = open("User information.txt", "w")
@@ -485,7 +483,6 @@ class Helper:
             file.write(text + '\n\n')
         file.close()
         program()
-
 
 
     def add_pass(self):
@@ -806,7 +803,7 @@ def auto_quit():
 def main():
     global _session
     _session = False
-    main_thread = Thread(target=program)
+    main_thread = Thread(target=program, daemon=True)
     main_thread.start()
     s_kill = Thread(target=auto_quit(), daemon=True)
     s_kill.start()
@@ -815,6 +812,5 @@ def main():
 
 
 if __name__ == '__main__':
-
     main()
 
